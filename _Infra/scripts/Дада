@@ -1,0 +1,47 @@
+-- ddl
+create table solders(
+name text,
+rank text
+);
+
+alter table solders add rank_id int;
+
+alter table solders add solder_id int;
+
+update solders set rank_id = 2 where rank = 'Лейтенант'
+
+update solders set rank_id = 1 where rank like 'мл%'
+update solders set rank_id = 3 where rank like 'ст%'
+
+update solders set solder_id = 4 where rank = 'младший Лейтенант'
+
+create table ranks(
+id int,
+name text
+)
+
+insert into ranks(id, name) values(1, 'Младший лейтенант')
+insert into ranks(id, name) values(2, 'Лейтенант')
+insert into ranks(id, name) values(3, 'Старший лейтенант')
+
+select * from solders, ranks
+where solders.rank_id = ranks.id
+
+
+
+select * from ranks
+
+select * from solders
+where rank like 'мл%';
+
+select * from solders
+where rank_id is not null;
+
+insert into solders(name, rank) values('Иванов', 'Лейтенант');
+insert into solders(name, rank) values('Иванов', 'мл / Лейтенант');
+insert into solders(name, rank) values('Иванов', 'ст / Лейтенант');
+insert into solders(name, rank) values('Иванов', 'младший Лейтенант');
+
+select solders.name || ' - ' || ranks.name as full_name from solders, ranks
+where solders.rank_id = ranks.id
+
