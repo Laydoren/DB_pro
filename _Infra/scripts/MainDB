@@ -8,29 +8,29 @@ DROP TABLE equipment_types;
 -- Типы оборудования
 CREATE TABLE equipment_types (
     id INTEGER NOT NULL PRIMARY KEY,
-    name VARCHAR NOT NULL UNIQUE
+    name VARCHAR (20) NOT NULL UNIQUE
 );
 
 -- Должности
 CREATE TABLE positions (
     id INTEGER NOT NULL PRIMARY KEY,
-    name VARCHAR NOT NULL UNIQUE
+    name VARCHAR (100) NOT NULL UNIQUE
 );
 
 -- Пользователи
 CREATE TABLE users (
     id INTEGER NOT NULL PRIMARY KEY,
-    login VARCHAR NOT NULL UNIQUE,
-    full_name VARCHAR NOT NULL,
+    login VARCHAR (20) NOT NULL UNIQUE,
+    full_name VARCHAR (100) NOT NULL,
     position_id INTEGER NOT NULL REFERENCES positions (id)
 );
 
 -- Параметры
 CREATE TABLE parameters (
     id INTEGER NOT NULL PRIMARY KEY,
-    name VARCHAR NOT NULL UNIQUE,
+    name VARCHAR (20) NOT NULL UNIQUE,
     min_value DECIMAL,  
-    max_value  DECIMAL,
+    max_value DECIMAL,
     default_value DECIMAL NOT NULL
 );
 
