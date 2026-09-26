@@ -66,8 +66,6 @@ INSERT INTO users (id, login, full_name, position_id) VALUES (3, 'KUP', 'Кон�
 INSERT INTO parameters (id, name, min_value, max_value, default_value)
 VALUES (1, 'Высота метеопоста', NULL, NULL, 100);
 INSERT INTO parameters (id, name, min_value, max_value, default_value)
-VALUES (99, 'Высота', NULL, NULL, 100);
-INSERT INTO parameters (id, name, min_value, max_value, default_value)
 VALUES (2, 'Температура', -58, 58, 15);
 INSERT INTO parameters (id, name, min_value, max_value, default_value)
 VALUES (3, 'Давление', 500, 900, 750);
@@ -78,9 +76,7 @@ INSERT INTO parameters (id, name, min_value, max_value, default_value)
 VALUES (5, 'Скорость ветра', 0, 15, 0);
 -- для ВР
 INSERT INTO parameters (id, name, min_value, max_value, default_value)
-VALUES (6, 'Дальность сноса пуль', 0, 150, 0);  
-INSERT INTO parameters (id, name, min_value, max_value, default_value)
-VALUES (16, 'Дальность пуль', 0, 150, 0); 
+VALUES (6, 'Дальность сноса пуль', 0, 150, 0);   
 
 -- Пачка (ДМК)
 INSERT INTO batches (id, batch_number, user_id, equipment_type_id, parameter_id, param_value, time_at)
@@ -105,8 +101,6 @@ INSERT INTO batches (id, batch_number, user_id, equipment_type_id, parameter_id,
 VALUES (9, 2, 3, 2, 4, 30, 24100);
 INSERT INTO batches (id, batch_number, user_id, equipment_type_id, parameter_id, param_value, time_at)
 VALUES (10, 2, 3, 2, 6, 120, 24100);
-INSERT INTO batches (id, batch_number, user_id, equipment_type_id, parameter_id, param_value, time_at)
-VALUES (11, 2, 3, 2, 99, 120, 24100);
 
 
 SELECT
