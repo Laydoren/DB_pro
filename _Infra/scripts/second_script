@@ -25,8 +25,6 @@ INSERT INTO parameter_types (id, name, min_value, max_value, default_value)
     SELECT id, name, min_value, max_value, default_value
     FROM parameters;
 
-DELETE FROM parameters;
-
 INSERT INTO base_units (id, name, parameter_type_id) VALUES (1, 'м', 1);
 INSERT INTO base_units (id, name, parameter_type_id) VALUES (2, 'C', 2);
 INSERT INTO base_units (id, name, parameter_type_id) VALUES (3, 'гПа', 3);
@@ -54,25 +52,17 @@ ALTER TABLE parameters DROP COLUMN min_value;
 ALTER TABLE parameters DROP COLUMN max_value;
 ALTER TABLE parameters DROP COLUMN default_value;
 
-
 INSERT INTO parameters (id, parameter_type_id, value, batch_id)
-    SELECT b.id, b.parameter_id, b.param_value, b.batch_number
+    SELECT 100 + b.id, b.parameter_id, b.param_value, b.id
     FROM batches AS b;
-
-
---Убираем дупликаты в логах
-DELETE FROM batches
-    WHERE id NOT IN (SELECT MIN(id) FROM batches GROUP BY batch_number);
 
 ALTER TABLE batches DROP COLUMN parameter_id;
 ALTER TABLE batches DROP COLUMN param_value;
-ALTER TABLE batches DROP COLUMN batch_number;
-
 
 
 SELECT
     b.time_at AS time_at,
-    b.id AS batch_number,
+    b.batch_number AS batch_number,
     u.full_name AS user_full_name,
     pt.name || ', ' || bu.name AS parameter_and_unit,
     p.value AS value
@@ -82,4 +72,5 @@ WHERE b.id  = p.batch_id
     AND pt.id = p.parameter_type_id
     AND bu.parameter_type_id = pt.id
 
-
+SELECT * FROM batches
+SELECT * FROM parameters
