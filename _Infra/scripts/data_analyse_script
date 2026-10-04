@@ -1,0 +1,65 @@
+--Скрипт анализа данных
+
+
+--Кол-во измерений у каждого пользователя
+SELECT
+    users.id AS user_id,
+    users.full_name AS user_full_name,
+    COUNT(parameters.id) AS measurement_count
+FROM users
+    LEFT JOIN batches ON batches.user_id = users.id
+    LEFT JOIN parameters ON parameters.batch_id = batches.id
+GROUP BY users.id, users.full_name
+ORDER BY users.id;
+
+
+--Проверка на пустые измерения
+SELECT
+	batches.id AS batch_id,
+	COUNT(parameters.id) AS number_of_params
+FROM batches
+	LEFT JOIN parameters ON batches.id = parameters.batch_id
+GROUP BY batches.id
+HAVING COUNT(parameters.id) = 0
+ORDER BY batches.id;
+
+--Проверка на кол-во измерений
+SELECT
+	batches.id AS batch_id,
+	COUNT(parameters.id) AS number_of_params
+FROM batches
+	LEFT JOIN parameters ON batches.id = parameters.batch_id
+GROUP BY batches.id
+HAVING COUNT(parameters.id) <> 5
+ORDER BY batches.id;
+
+
+--Проверка на введёные данные
+SELECT
+	parameters.id AS parameter_id,
+	parameters.value AS parameter_value,
+	pt.min_value AS min_value,
+	pt.max_value AS max_value
+FROM parameters
+	LEFT JOIN public.parameter_types AS pt ON parameters.parameter_type_id = pt.id
+WHERE
+	(parameters.value < pt.min_value) OR (parameters.value > pt.max_value);
+
+
+--Проверка, что все ед.измер соответсвуют параметрам
+SELECT
+    parameters.id AS parameter_row_id,
+    parameters.parameter_type_id AS parameter_type_id_parameters,
+	base_units.parameter_type_id AS parameter_type_id_baseUnits,
+    base_units.name
+FROM parameters
+    LEFT JOIN (
+        SELECT 
+			parameter_type_id,
+			name
+        FROM base_units
+    ) AS base_units ON base_units.parameter_type_id = parameters.parameter_type_id
+WHERE base_units.parameter_type_id IS NULL;
+	
+--SELECT * from public.batches
+--SELECT * from public.parameters
