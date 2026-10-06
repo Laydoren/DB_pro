@@ -18,9 +18,9 @@ SELECT
 	batches.id AS batch_id,
 	COUNT(parameters.id) AS number_of_params
 FROM batches
-	LEFT JOIN parameters ON batches.id = parameters.batch_id
+    LEFT JOIN parameters ON batches.id = parameters.batch_id
 GROUP BY batches.id
-HAVING COUNT(parameters.id) = 0
+HAVING COALESCE(COUNT(parameters.id), 0) = 0
 ORDER BY batches.id;
 
 --Проверка на кол-во измерений
@@ -30,7 +30,7 @@ SELECT
 FROM batches
 	LEFT JOIN parameters ON batches.id = parameters.batch_id
 GROUP BY batches.id
-HAVING COUNT(parameters.id) <> 5
+HAVING COALESCE(COUNT(parameters.id), 0) <> 5
 ORDER BY batches.id;
 
 
