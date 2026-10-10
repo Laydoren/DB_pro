@@ -219,18 +219,18 @@ COMMIT;
 
 BEGIN;
  
-CREATE TABLE temp_corr (
+CREATE TABLE temp_calc (
 	id INTEGER NOT NULL PRIMARY KEY,
 	name VARCHAR (20) NOT NULL UNIQUE,
 	virtual_correction DECIMAL NOT NULL
 );
  
-CREATE SEQUENCE public.seq_temp_corr;
-ALTER TABLE public.temp_corr
-	ALTER COLUMN id SET DEFAULT nextval('public.seq_temp_corr');
+CREATE SEQUENCE public.seq_temp_calc;
+ALTER TABLE public.temp_calc
+	ALTER COLUMN id SET DEFAULT nextval('public.seq_temp_calc');
  
 --t0 (°C) → ΔT_V (поправка)
-INSERT INTO temp_corr (name, virtual_correction) VALUES
+INSERT INTO temp_calc (name, virtual_correction) VALUES
 ('Ниже 0', 0),
 ('0-5', 0.5),
 ('10-15', 1),
