@@ -1,5 +1,5 @@
---Создание структуры
-BEGIN;
+DO $$
+BEGIN
 
 --Типы оборудования
 CREATE TABLE equipment_types (
@@ -101,10 +101,11 @@ ALTER TABLE public.parameters
 	ALTER COLUMN id SET DEFAULT nextval('public.seq_parameters');
 
 COMMIT;
-
+END $$
 
 --Заполняем данные
-BEGIN;
+DO $$
+BEGIN
 
 INSERT INTO equipment_types (name) VALUES ('ДМК'), ('ВР');
 
@@ -181,10 +182,12 @@ INSERT INTO parameters (parameter_type_id, value, batch_id) VALUES
 (6, 95, 4);
 
 COMMIT;
+END $$
 
 
 --связи
-BEGIN;
+DO $$
+BEGIN
 
 ALTER TABLE users
     ADD CONSTRAINT fk_users_position
@@ -215,10 +218,11 @@ ALTER TABLE parameters
     FOREIGN KEY (batch_id) REFERENCES batches (id);
 
 COMMIT;
+END $$
 
-
-BEGIN;
- 
+DO $$
+BEGIN
+--Nf,kbwf c dsxbcktybtv ntvgthfnehs
 CREATE TABLE temp_calc (
 	id INTEGER NOT NULL PRIMARY KEY,
 	name VARCHAR (20) NOT NULL UNIQUE,
@@ -228,8 +232,7 @@ CREATE TABLE temp_calc (
 CREATE SEQUENCE public.seq_temp_calc;
 ALTER TABLE public.temp_calc
 	ALTER COLUMN id SET DEFAULT nextval('public.seq_temp_calc');
- 
---t0 (°C) → ΔT_V (поправка)
+
 INSERT INTO temp_calc (name, virtual_correction) VALUES
 ('Ниже 0', 0),
 ('0-5', 0.5),
@@ -240,4 +243,4 @@ INSERT INTO temp_calc (name, virtual_correction) VALUES
 ('40', 4.5);
  
 COMMIT;
-
+END $$
