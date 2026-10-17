@@ -105,7 +105,6 @@ COMMIT;
 
 --Заполняем данные
 
-BEGIN
 
 INSERT INTO equipment_types (name) VALUES ('ДМК'), ('ВР');
 
@@ -187,7 +186,6 @@ COMMIT;
 
 --связи
 
-BEGIN
 
 ALTER TABLE users
     ADD CONSTRAINT fk_users_position
@@ -220,26 +218,27 @@ ALTER TABLE parameters
 COMMIT;
 
 
-BEGIN
 --Nf,kbwf c dsxbcktybtv ntvgthfnehs
+
 CREATE TABLE temp_calc (
 	id INTEGER NOT NULL PRIMARY KEY,
 	name VARCHAR (20) NOT NULL UNIQUE,
+	temperature DECIMAL NOT NULL UNIQUE,
 	virtual_correction DECIMAL NOT NULL
 );
- 
+
 CREATE SEQUENCE public.seq_temp_calc;
 ALTER TABLE public.temp_calc
 	ALTER COLUMN id SET DEFAULT nextval('public.seq_temp_calc');
 
-INSERT INTO temp_calc (name, virtual_correction) VALUES
-('Ниже 0', 0),
-('0-5', 0.5),
-('10-15', 1),
-('20', 1.5),
-('25', 2),
-('30', 3.5),
-('40', 4.5);
+INSERT INTO temp_calc (name, temperature, virtual_correction) VALUES
+('Ниже 0', 0, 0),
+('0-5', 5, 0.5),
+('10-15', 10, 1),
+('20', 20, 1.5),
+('25', 25, 2),
+('30', 30, 3.5),
+('40', 40, 4.5);
  
 COMMIT;
-END $$
+END $$;
