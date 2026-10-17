@@ -1,0 +1,23 @@
+DO $$
+DECLARE
+	r RECORD;
+	failed INTEGER := 0;
+BEGIN
+	--Проверка значений расчёта интерполяции
+	FOR r IN
+		SELECT * 
+		FROM (VALUES (-5, 0), (5, 0.5), (10, 1), (20, 1.5), (25, 2), (30, 3.5), (40, 4.5), (50, 4.5), (35, 4), (23, 1.8))
+		AS c(t0, expected)
+	LOOP
+		IF abs(public.calc_interpolation(r.t0, public.get_temperature_interpolation(r.t0)) - r.expected) >= 0.0001 THEN
+			RAISE WARNING 't0 = %: ожидалось % | вышло %', r.t0, r.expected, trim_scale(public.calc_interpolation(r.t0, public.get_temperature_interpolation(r.t0)));
+			failed := failed + 1;
+		END IF;
+	END LOOP;
+
+	IF failed > 0 THEN
+		RAISE EXCEPTION 'Не пройдено проверок: %', failed;
+	END IF;
+
+	RAISE NOTICE 'Все проверки пройдены';
+END $$;
