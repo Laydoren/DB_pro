@@ -15,11 +15,10 @@ CREATE TYPE public.interpolation_params AS
 	y1 numeric
 );
 
-COMMENT ON TYPE public.interpolation_params IS 'Тип данных интерполяции с 2 опорными точками';
-
 ALTER TYPE public.interpolation_params
     OWNER TO postgres;
 
+COMMENT ON TYPE public.interpolation_params IS 'Тип данных интерполяции с 2 опорными точками';
 
 --Функция получения таблицы интерполяции
 CREATE OR REPLACE FUNCTION public.get_temperature_interpolation(
