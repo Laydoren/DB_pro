@@ -15,6 +15,8 @@ CREATE TYPE public.interpolation_params AS
 	y1 numeric
 );
 
+COMMENT ON TYPE public.interpolation_params IS 'Тип данных интерполяции с 2 опорными точками';
+
 ALTER TYPE public.interpolation_params
     OWNER TO postgres;
 
@@ -59,9 +61,11 @@ BEGIN
 END;
 $BODY$;
 
+
 ALTER FUNCTION public.get_temperature_interpolation(numeric)
     OWNER TO postgres;
 
+COMMENT ON FUNCTION public.get_temperature_interpolation(numeric) IS 'Функция возвращает опорные точки для интерполяции';
 
 --Функция подсчёта интерполяции
 DROP FUNCTION IF EXISTS public.calc_interpolation(numeric, interpolation_params);
@@ -87,6 +91,6 @@ $BODY$;
 ALTER FUNCTION public.calc_interpolation(numeric, interpolation_params)
     OWNER TO postgres;
 
-
+COMMENT ON FUNCTION public.calc_interpolation(numeric, interpolation_params) IS 'Функция вычисляет интерполяцию на основе температуры и типа данных интерполяции';
 
 END $$;
