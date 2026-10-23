@@ -1,0 +1,95 @@
+DO $$
+BEGIN
+
+DROP FUNCTION IF EXISTS public.calc_interpolation(numeric, interpolation_params);
+DROP FUNCTION IF EXISTS public.get_temperature_interpolation(numeric);
+DROP TYPE IF EXISTS public.interpolation_params;
+
+
+--Создаём новый тип данных интерполяции
+CREATE TYPE public.interpolation_params AS
+(
+	x0 numeric,
+	y0 numeric,
+	x1 numeric,
+	y1 numeric
+);
+
+ALTER TYPE public.interpolation_params
+    OWNER TO postgres;
+
+COMMENT ON TYPE public.interpolation_params IS 'Тип данных интерполяции с 2 опорными точками';
+
+--Функция получения таблицы интерполяции
+CREATE OR REPLACE FUNCTION public.get_temperature_interpolation(
+	temp numeric)
+    RETURNS interpolation_params
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+AS $BODY$
+DECLARE
+	result public.interpolation_params;
+
+BEGIN
+
+	SELECT 
+		CASE WHEN temp < 0 THEN temp ELSE low_bound.temperature END, 
+		low_bound.virtual_correction, 
+		CASE WHEN temp >= 40 THEN temp ELSE high_bound.temperature END, 
+		high_bound.virtual_correction
+		INTO result.x0, result.y0, result.x1, result.y1
+	FROM
+		(
+		 SELECT temp_calc.temperature, temp_calc.virtual_correction
+		 FROM temp_calc
+		 WHERE temp_calc.temperature <= least(greatest(temp, 0), 40)
+		 ORDER BY temp_calc.temperature DESC
+		 LIMIT 1
+		) AS low_bound,
+		
+		(
+		 SELECT temp_calc.temperature, temp_calc.virtual_correction
+		 FROM temp_calc
+		 WHERE temp_calc.temperature >= least(greatest(temp, 0), 40)
+		 ORDER BY temp_calc.temperature
+		 LIMIT 1
+		) AS high_bound;
+
+	RETURN result;
+END;
+$BODY$;
+
+
+ALTER FUNCTION public.get_temperature_interpolation(numeric)
+    OWNER TO postgres;
+
+COMMENT ON FUNCTION public.get_temperature_interpolation(numeric) IS 'Функция возвращает опорные точки для интерполяции';
+
+--Функция подсчёта интерполяции
+DROP FUNCTION IF EXISTS public.calc_interpolation(numeric, interpolation_params);
+
+CREATE OR REPLACE FUNCTION public.calc_interpolation(
+	x numeric,
+	interparams interpolation_params)
+    RETURNS numeric
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+AS $BODY$
+BEGIN
+
+	RETURN CASE
+		WHEN interparams.x0 = interparams.x1 THEN interparams.y0
+		ELSE interparams.y0 + (x - interparams.x0) / (interparams.x1 - interparams.x0) * (interparams.y1 - interparams.y0)
+	END;
+	
+END;
+$BODY$;
+
+ALTER FUNCTION public.calc_interpolation(numeric, interpolation_params)
+    OWNER TO postgres;
+
+COMMENT ON FUNCTION public.calc_interpolation(numeric, interpolation_params) IS 'Функция вычисляет интерполяцию на основе температуры и типа данных интерполяции';
+
+END $$;
