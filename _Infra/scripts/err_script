@@ -1,0 +1,100 @@
+DO $$
+BEGIN
+
+DROP FUNCTION IF EXISTS public.error_check(public.parameter_list[]);
+DROP FUNCTION IF EXISTS public.get_parameter_list(INTEGER);
+DROP TYPE IF EXISTS public.parameter_list;
+DROP TABLE IF EXISTS parameter_errors;
+DROP SEQUENCE IF EXISTS public.seq_parameter_errors;
+
+
+CREATE TABLE parameter_errors (
+	id INTEGER NOT NULL PRIMARY KEY,
+	parameter_type_id INTEGER NOT NULL,
+	error_text VARCHAR (200) NOT NULL
+);
+ 
+CREATE SEQUENCE public.seq_parameter_errors;
+ALTER TABLE public.parameter_errors
+	ALTER COLUMN id SET DEFAULT nextval('public.seq_parameter_errors');
+ 
+INSERT INTO public.parameter_errors (parameter_type_id, error_text) VALUES
+(2, 'Температура вне допустимого диапазона'),
+(3, 'Давление вне допустимого диапазона'),
+(4, 'Направление ветра вне допустимого диапазона'),
+(5, 'Скорость ветра вне допустимого диапазона'),
+(6, 'Дальность сноса пуль вне допустимого диапазона');
+
+
+
+CREATE TYPE public.parameter_list AS
+(
+	parameter_type_id integer,
+	min_value numeric,
+	max_value numeric,
+	batch_id integer
+);
+
+ALTER TYPE public.parameter_list
+    OWNER TO postgres;
+
+COMMENT ON TYPE public.parameter_list
+    IS 'Список параметров с допустимым диапазоном';
+
+
+
+CREATE OR REPLACE FUNCTION public.get_parameter_list(
+	batch_id integer)
+    RETURNS parameter_list[]
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+AS $BODY$
+BEGIN
+	RETURN ARRAY(
+		SELECT ROW(id, min_value, max_value, batch_id)::public.parameter_list
+		FROM public.parameter_types
+		ORDER BY id
+	);
+END;
+$BODY$;
+
+ALTER FUNCTION public.get_parameter_list(integer)
+    OWNER TO postgres;
+
+COMMENT ON FUNCTION public.get_parameter_list(integer)
+    IS 'Заполняет parameter_list и возвращает список параметров';
+
+
+CREATE OR REPLACE FUNCTION public.error_check(
+	par_list parameter_list[],
+	OUT has_error boolean,
+	OUT error_num integer,
+	OUT error_text text)
+    RETURNS record
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+AS $BODY$
+BEGIN
+	SELECT
+		COUNT(prm.id) > 0,
+		COUNT(prm.id),
+		STRING_AGG(err.error_text, '; ')
+		INTO has_error, error_num, error_text
+	FROM public.parameters AS prm
+	JOIN UNNEST(par_list) AS pl ON pl.parameter_type_id = prm.parameter_type_id AND pl.batch_id = prm.batch_id
+	LEFT JOIN public.parameter_errors AS err ON err.parameter_type_id = prm.parameter_type_id
+	WHERE prm.value < pl.min_value OR prm.value > pl.max_value;
+END;
+$BODY$;
+
+ALTER FUNCTION public.error_check(parameter_list[])
+    OWNER TO postgres;
+
+COMMENT ON FUNCTION public.error_check(parameter_list[])
+    IS 'Проверка значений parameters из пачки на наличие ошибок диапазона';
+
+
+
+END $$;

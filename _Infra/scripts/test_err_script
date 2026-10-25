@@ -1,0 +1,75 @@
+BEGIN;
+
+DO $$
+BEGIN
+
+INSERT INTO batches (user_id, equipment_type_id, time_at) VALUES
+(1, 1, 24120);
+ 
+INSERT INTO parameters (parameter_type_id, value, batch_id) VALUES
+(1, 33, currval('public.seq_batches')),
+(2, 20, currval('public.seq_batches')),
+(3, 950, currval('public.seq_batches')),
+(4, 75, currval('public.seq_batches')),
+(5, 12, currval('public.seq_batches'));
+ 
+
+INSERT INTO batches (user_id, equipment_type_id, time_at) VALUES
+(3, 2, 24120);
+ 
+INSERT INTO parameters (parameter_type_id, value, batch_id) VALUES
+(1, 55, currval('public.seq_batches')),
+(2, -70, currval('public.seq_batches')),
+(3, 450, currval('public.seq_batches')),
+(4, 30, currval('public.seq_batches')),
+(6, 200, currval('public.seq_batches'));
+
+
+INSERT INTO batches (user_id, equipment_type_id, time_at) VALUES
+(1, 1, 24120);
+
+INSERT INTO parameters (parameter_type_id, value, batch_id) VALUES
+(1, 33, currval('public.seq_batches')),
+(2, 20, currval('public.seq_batches')),
+(3, 950, currval('public.seq_batches')),
+(4, 75, currval('public.seq_batches')),
+(5, 12, currval('public.seq_batches'));
+
+
+
+END $$;
+
+--Список параметров с ошибками
+SELECT
+	b.id AS id,
+	et.name AS equipment,
+	MAX(CASE WHEN prm.parameter_type_id = 1 THEN prm.value END) AS height,
+	MAX(CASE WHEN prm.parameter_type_id = 2 THEN prm.value END) AS temp,
+	MAX(CASE WHEN prm.parameter_type_id = 3 THEN prm.value END) AS press,
+	MAX(CASE WHEN prm.parameter_type_id = 4 THEN prm.value END) AS direct,
+	MAX(CASE WHEN prm.parameter_type_id = 5 THEN prm.value END) AS wind_vel,
+	MAX(CASE WHEN prm.parameter_type_id = 6 THEN prm.value END) AS wind_drift,
+	err.has_error,
+	err.error_text
+ 
+FROM batches AS b
+	JOIN equipment_types AS et ON et.id = b.equipment_type_id
+	LEFT JOIN parameters AS prm ON prm.batch_id = b.id
+	CROSS JOIN public.error_check(public.get_parameter_list(b.id)) AS err
+GROUP BY b.id, et.name, err.has_error, err.error_text
+ORDER BY b.id;
+
+
+--Лучший стрелок
+SELECT
+	u.full_name AS full_name,
+	SUM(err.error_num) AS total_err
+	
+FROM batches AS b
+	JOIN users AS u ON b.user_id = u.id
+	CROSS JOIN public.error_check(public.get_parameter_list(b.id)) AS err
+GROUP BY u.full_name
+ORDER BY SUM(err.error_num);
+-- ROLLBACK;
+
+
