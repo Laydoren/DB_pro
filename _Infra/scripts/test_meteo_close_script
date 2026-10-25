@@ -1,0 +1,4 @@
+SELECT
+	public.get_date(),
+	public.get_height(60),
+	public.get_presstemp(765, 25);

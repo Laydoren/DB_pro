@@ -1,0 +1,108 @@
+DO $$
+BEGIN
+
+DROP FUNCTION IF EXISTS public.get_presstemp(INTEGER, NUMERIC);
+DROP FUNCTION IF EXISTS public.get_height(INTEGER);
+DROP FUNCTION IF EXISTS public.get_date(TIMESTAMP);
+DROP TABLE IF EXISTS constants;
+DROP SEQUENCE IF EXISTS public.seq_constants;
+
+
+CREATE TABLE constants (
+	id INTEGER NOT NULL PRIMARY KEY,
+	name VARCHAR (100) NOT NULL UNIQUE,
+	value NUMERIC NOT NULL
+);
+
+CREATE SEQUENCE public.seq_constants;
+ALTER TABLE constants
+	ALTER COLUMN id SET DEFAULT nextval('public.seq_constants');
+ 
+INSERT INTO constants (name, value) VALUES
+('pressure', 750),
+('temperature', 15.9);
+
+
+
+CREATE OR REPLACE FUNCTION public.get_date(
+	measured_at timestamp without time zone DEFAULT now())
+    RETURNS text
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+AS $BODY$
+BEGIN
+	RETURN LEFT(to_char(measured_at, 'DDHH24MI'), 5);
+END;
+$BODY$;
+
+ALTER FUNCTION public.get_date(timestamp without time zone)
+    OWNER TO postgres;
+
+COMMENT ON FUNCTION public.get_date(timestamp without time zone)
+    IS 'Получение текущего системного времени в формате ДДЧЧМ';
+
+
+CREATE OR REPLACE FUNCTION public.get_height(
+	height integer)
+    RETURNS text
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+AS $BODY$
+BEGIN
+	RETURN to_char(height, '0000');
+END;
+$BODY$;
+
+ALTER FUNCTION public.get_height(integer)
+    OWNER TO postgres;
+
+COMMENT ON FUNCTION public.get_height(integer)
+    IS 'Получение высоты над уровнем моря в формате ВВВВ';
+
+
+CREATE OR REPLACE FUNCTION public.get_presstemp(
+	pressure integer,
+	temp numeric)
+    RETURNS text
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+AS $BODY$
+DECLARE
+	const_press NUMERIC;
+	const_temp NUMERIC;
+	
+	calc_press INTEGER;
+	calc_temp INTEGER;
+	
+	cor_press TEXT;
+	cor_temp TEXT;
+BEGIN
+	SELECT value INTO const_press FROM public.constants WHERE name = 'pressure';
+	SELECT value INTO const_temp FROM public.constants WHERE name = 'temperature';
+
+	calc_press := pressure - const_press;
+
+	IF calc_press < 0 THEN
+		cor_press := '5' || to_char(abs(calc_press), '00');
+	ELSE
+		cor_press := to_char(calc_press, '000');
+	END IF;
+
+	calc_temp := round(temp + public.calc_interpolation(temp, public.get_temperature_interpolation(temp)) - const_temp);
+	cor_temp := to_char(calc_temp, '00');
+
+	RETURN cor_press || cor_temp;
+END;
+$BODY$;
+
+ALTER FUNCTION public.get_presstemp(integer, numeric)
+    OWNER TO postgres;
+
+COMMENT ON FUNCTION public.get_presstemp(integer, numeric)
+    IS 'Получение отклонения давления и температуры в формате БББТТ';
+
+
+END $$;
