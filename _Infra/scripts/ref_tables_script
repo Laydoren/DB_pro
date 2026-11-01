@@ -1,0 +1,107 @@
+DO $$
+BEGIN
+
+--Общая таблица для ДМК и ВР
+CREATE TABLE IF NOT EXISTS mean_temperature_deviation
+(
+	id integer PRIMARY KEY,
+	height integer NOT NULL,
+	temp_delta integer NOT NULL,
+	negative integer NOT NULL,
+	positive integer
+);
+
+CREATE SEQUENCE IF NOT EXISTS public.seq_mean_temperature_deviation;
+ALTER TABLE mean_temperature_deviation
+	ALTER COLUMN id SET DEFAULT nextval('public.seq_mean_temperature_deviation');
+
+COMMENT ON TABLE mean_temperature_deviation IS 'Таблица среднего отклонения температуры воздуха';
+COMMENT ON COLUMN mean_temperature_deviation.height IS 'Высота';
+COMMENT ON COLUMN mean_temperature_deviation.temp_delta IS 'Отклонение температуры';
+COMMENT ON COLUMN mean_temperature_deviation.negative IS 'СОТ при отрицательных значениях';
+COMMENT ON COLUMN mean_temperature_deviation.positive IS 'СОТ при положительных значениях';
+
+
+
+--Таблица для ВР
+CREATE TABLE IF NOT EXISTS mean_wind_speed_vr
+(
+	id integer PRIMARY KEY,
+	height integer NOT NULL,
+	drift_range integer NOT NULL,
+	value integer NOT NULL
+);
+
+CREATE SEQUENCE IF NOT EXISTS public.seq_mean_wind_speed_vr;
+ALTER TABLE mean_wind_speed_vr
+	ALTER COLUMN id SET DEFAULT nextval('public.seq_mean_wind_speed_vr');
+
+CREATE TABLE IF NOT EXISTS mws_vr_angle
+(
+	id integer PRIMARY KEY,
+	height_mws_vr_id integer NOT NULL,
+	value integer NOT NULL
+);
+
+CREATE SEQUENCE IF NOT EXISTS public.seq_mws_vr_angle;
+ALTER TABLE mws_vr_angle
+	ALTER COLUMN id SET DEFAULT nextval('public.seq_mws_vr_angle');
+
+
+COMMENT ON TABLE mean_wind_speed_vr IS 'Скорость среднего ветра';
+COMMENT ON COLUMN mean_wind_speed_vr.height IS 'Высота';
+COMMENT ON COLUMN mean_wind_speed_vr.drift_range IS 'Дальность сноса пуль';
+COMMENT ON COLUMN mean_wind_speed_vr.value IS 'Значение из таблицы';
+
+COMMENT ON TABLE mws_vr_angle IS 'Таблица величин увеличения угола';
+COMMENT ON COLUMN mws_vr_angle.value IS 'Величина увеличения угла';
+
+
+
+--Таблица для ДМК
+CREATE TABLE IF NOT EXISTS mean_wind_speed_dmk
+(
+	id integer PRIMARY KEY,
+	height integer NOT NULL,
+	wind_speed integer NOT NULL,
+	value integer NOT NULL
+);
+
+CREATE SEQUENCE IF NOT EXISTS public.seq_mean_wind_speed_dmk;
+ALTER TABLE mean_wind_speed_dmk
+	ALTER COLUMN id SET DEFAULT nextval('public.seq_mean_wind_speed_dmk');
+
+CREATE TABLE IF NOT EXISTS mws_dmk_angle
+(
+	id integer PRIMARY KEY,
+	height_mws_dmk_id integer NOT NULL,
+	value integer NOT NULL
+);
+
+CREATE SEQUENCE IF NOT EXISTS public.seq_mws_dmk_angle;
+ALTER TABLE mws_dmk_angle
+	ALTER COLUMN id SET DEFAULT nextval('public.seq_mws_dmk_angle');
+
+COMMENT ON TABLE  public.mean_wind_speed_dmk IS 'Скорость среднего ветра';
+COMMENT ON COLUMN public.mean_wind_speed_dmk.height IS 'Высота';
+COMMENT ON COLUMN public.mean_wind_speed_dmk.wind_speed IS 'Скорость ветра';
+COMMENT ON COLUMN public.mean_wind_speed_dmk.value IS 'Значение из таблицы';
+
+COMMENT ON TABLE  public.mws_dmk_angle IS 'Таблица величин увеличения угола';
+COMMENT ON COLUMN public.mws_dmk_angle.value IS 'Величина увеличения угла';
+
+
+
+ALTER TABLE mws_vr_angle
+	DROP CONSTRAINT IF EXISTS fk_mws_vr_angle_mean_wind_speed_vr;
+ALTER TABLE mws_vr_angle
+	ADD CONSTRAINT fk_mws_vr_angle_mean_wind_speed_vr
+	FOREIGN KEY (height_mws_vr_id) REFERENCES mean_wind_speed_vr (id);
+
+ALTER TABLE mws_dmk_angle
+	DROP CONSTRAINT IF EXISTS fk_mws_dmk_angle_mean_wind_speed_dmk;
+ALTER TABLE mws_dmk_angle
+	ADD CONSTRAINT fk_mws_dmk_angle_mean_wind_speed_dmk
+	FOREIGN KEY (height_mws_dmk_id) REFERENCES mean_wind_speed_dmk (id);
+
+END $$;
