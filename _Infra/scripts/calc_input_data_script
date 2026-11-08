@@ -147,7 +147,6 @@ BEGIN
 		AND t.parent_id = (SELECT id FROM public.calc_correction_types WHERE code = 'WIND_DIRECTION');
 
 
-
  	--Проверка значений
 	IF par_input < calc_header[1] THEN --Слабыйветор/снос
 		dd := '00';
@@ -155,7 +154,6 @@ BEGIN
 		RETURN;
 	END IF;
 
- 
  
 	calc_pos := round((par_input - calc_header[1]) / (calc_header[2] - calc_header[1])) + 1;
  
