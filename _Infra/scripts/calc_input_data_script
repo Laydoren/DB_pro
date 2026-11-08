@@ -1,0 +1,230 @@
+DO $$
+BEGIN
+
+DROP PROCEDURE IF EXISTS public.calculate_meteo(public.parameter_list[], INTEGER);
+DROP FUNCTION IF EXISTS public.get_parameter_value(INTEGER, INTEGER);
+DROP FUNCTION IF EXISTS public.get_temp_deviation(NUMERIC);
+DROP FUNCTION IF EXISTS public.get_temp_correction(INTEGER, INTEGER);
+DROP FUNCTION IF EXISTS public.get_wind_correction(INTEGER, NUMERIC, INTEGER, INTEGER);
+
+
+INSERT INTO constants (name, value) VALUES
+('negative_temperature', 50),
+('wind_direction', 60)
+ON CONFLICT (name) DO NOTHING;
+
+
+
+CREATE OR REPLACE FUNCTION public.get_parameter_value(
+	par_batch_id integer,
+	par_type_id integer)
+    RETURNS numeric
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+AS $BODY$
+BEGIN
+	RETURN COALESCE(
+		(SELECT value FROM public.parameters WHERE batch_id = par_batch_id AND parameter_type_id = par_type_id),
+		(SELECT default_value FROM public.parameter_types WHERE id = par_type_id));
+END;
+$BODY$;
+
+ALTER FUNCTION public.get_parameter_value(integer, integer)
+    OWNER TO postgres;
+
+COMMENT ON FUNCTION public.get_parameter_value(integer, integer)
+    IS 'Получения значения параметра пачки';
+
+
+
+CREATE OR REPLACE FUNCTION public.get_temp_deviation(
+	par_temp numeric)
+    RETURNS integer
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+AS $BODY$
+DECLARE
+	const_temp NUMERIC;
+BEGIN
+	SELECT value INTO const_temp FROM public.constants WHERE name = 'temperature';
+
+	RETURN round(par_temp + public.calc_interpolation(par_temp, public.get_temperature_interpolation(par_temp)) - const_temp);
+END;
+$BODY$;
+
+ALTER FUNCTION public.get_temp_deviation(numeric)
+    OWNER TO postgres;
+
+COMMENT ON FUNCTION public.get_temp_deviation(numeric)
+    IS 'Расчёт отклонения температуры';
+
+
+
+CREATE OR REPLACE FUNCTION public.get_temp_correction(
+	par_deviation integer,
+	par_height_id integer)
+    RETURNS text
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+AS $BODY$
+DECLARE
+	const_negative NUMERIC;
+	calc_header INTEGER[];
+	calc_row INTEGER[];
+	calc_tens INTEGER := abs(par_deviation) / 10 * 10;
+	calc_units INTEGER := abs(par_deviation) % 10;
+	calc_sum INTEGER;
+BEGIN
+	SELECT value INTO const_negative FROM public.constants WHERE name = 'negative_temperature';
+ 
+	--Получение температуры
+	SELECT h.header_values, c.row_values INTO calc_header, calc_row
+	FROM public.calc_correction AS c
+	JOIN public.calc_correction_types AS t ON t.id = c.type_id
+	JOIN public.calc_correction_headers AS h ON h.id = t.header_id
+	WHERE c.height_id = par_height_id
+		AND t.code = CASE WHEN par_deviation < 0 THEN 'TEMPERATURE_NEGATIVE' ELSE 'TEMPERATURE_POSITIVE' END;
+
+ 
+	calc_sum := CASE WHEN calc_tens > 0 THEN calc_row[array_position(calc_header, calc_tens)] ELSE 0 END
+		+ CASE WHEN calc_units > 0 THEN calc_row[array_position(calc_header, calc_units)] ELSE 0 END;
+ 
+	IF par_deviation < 0 THEN
+		calc_sum := abs(calc_sum) + const_negative;
+	END IF;
+ 
+	RETURN lpad(calc_sum::text, 2, '0');
+END;
+$BODY$;
+ 
+ALTER FUNCTION public.get_temp_correction(integer, integer)
+    OWNER TO postgres;
+ 
+COMMENT ON FUNCTION public.get_temp_correction(integer, integer)
+    IS 'Расчёт температуры по таблице';
+
+
+
+
+CREATE OR REPLACE FUNCTION public.get_wind_correction(
+	par_equip_id integer,
+	par_input numeric,
+	par_direction integer,
+	par_height_id integer,
+	OUT dd text,
+	OUT vv text)
+    RETURNS record
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+AS $BODY$
+DECLARE
+	calc_header INTEGER[];
+	calc_speed INTEGER[];
+	calc_delta INTEGER;
+	calc_pos INTEGER;
+	calc_params public.interpolation_params;
+	wind_direction NUMERIC;
+BEGIN
+	SELECT value INTO wind_direction FROM public.constants WHERE name = 'wind_direction';
+
+	--Tаблица скорости ветраи
+	SELECT h.header_values, c.row_values INTO calc_header, calc_speed
+	FROM public.calc_correction AS c
+	JOIN public.calc_correction_types AS t ON t.id = c.type_id
+	JOIN public.calc_correction_headers AS h ON h.id = t.header_id
+	WHERE c.height_id = par_height_id AND t.measurment_equipment_id = par_equip_id
+		AND t.parent_id = (SELECT id FROM public.calc_correction_types WHERE code = 'WIND_SPEED');
+		
+ 	--Tаблица увеличения направлеиеня для типа оборудования
+	SELECT c.row_values[1] INTO calc_delta
+	FROM public.calc_correction AS c
+	JOIN public.calc_correction_types AS t ON t.id = c.type_id
+	WHERE c.height_id = par_height_id AND t.measurment_equipment_id = par_equip_id
+		AND t.parent_id = (SELECT id FROM public.calc_correction_types WHERE code = 'WIND_DIRECTION');
+
+
+
+ 	--Проверка значений
+	IF calc_header IS NULL THEN
+		RAISE EXCEPTION 'Для типа оборудования % нет таблиц корректировок', par_equip_id;
+	END IF;
+ 
+	IF par_input < calc_header[1] THEN --Слабыйветор/снос
+		dd := '00';
+		vv := '00';
+		RETURN;
+	END IF;
+
+ 
+ 
+	calc_pos := round((par_input - calc_header[1]) / (calc_header[2] - calc_header[1])) + 1;
+ 
+	IF par_direction + calc_delta >= wind_direction THEN
+		dd := lpad((par_direction - wind_direction + calc_delta)::text, 2, '0');
+	ELSE
+		dd := lpad((par_direction + calc_delta)::text, 2, '0');
+	END IF;
+ 
+	vv := lpad(calc_speed[calc_pos]::text, 2, '0');
+
+END;
+$BODY$;
+ 
+ALTER FUNCTION public.get_wind_correction(integer, numeric, integer, integer)
+    OWNER TO postgres;
+ 
+COMMENT ON FUNCTION public.get_wind_correction(integer, numeric, integer, integer)
+    IS 'Расчёт скорости и направления по таблице';
+
+
+
+
+CREATE OR REPLACE PROCEDURE public.calculate_meteo(
+	p_params public.parameter_list[],
+	p_equip_id integer)
+    LANGUAGE 'plpgsql'
+AS $BODY$
+DECLARE
+	proc_pack_id INTEGER := (p_params[1]).batch_id;
+	proc_deviation INTEGER;
+	proc_wind NUMERIC;
+	proc_direction INTEGER;
+	proc_has_error BOOLEAN;
+	proc_error_text TEXT;
+	proc_height RECORD;
+	proc_wind_corr RECORD;
+BEGIN
+
+	SELECT has_error, error_text INTO proc_has_error, proc_error_text FROM public.error_check(p_params);
+	IF proc_has_error THEN
+		RAISE EXCEPTION '%', proc_error_text;
+	END IF;
+ 
+	proc_deviation := public.get_temp_deviation(public.get_parameter_value(proc_pack_id, 2));
+	proc_direction := public.get_parameter_value(proc_pack_id, 4);
+	proc_wind := public.get_parameter_value(proc_pack_id, CASE p_equip_id WHEN 1 THEN 5 ELSE 6 END);
+ 
+
+	FOR proc_height IN SELECT id, height FROM public.calc_correction_heights ORDER BY height LOOP
+		proc_wind_corr := public.get_wind_correction(p_equip_id, proc_wind, proc_direction, proc_height.id);
+ 
+		RAISE NOTICE 'В=% TT=% HH=% CC=%',
+			lpad((proc_height.height / 100)::text, 2, '0'),
+			public.get_temp_correction(proc_deviation, proc_height.id),
+			proc_wind_corr.dd,
+			proc_wind_corr.vv;
+	END LOOP;
+END;
+$BODY$;
+ 
+ALTER PROCEDURE public.calculate_meteo(public.parameter_list[], integer)
+    OWNER TO postgres;
+
+
+
+
+END $$;
