@@ -1,0 +1,31 @@
+DO $$
+DECLARE
+	var_batch_id INTEGER;
+BEGIN
+	INSERT INTO batches (user_id, equipment_type_id, time_at) VALUES (1, 1, 24300) RETURNING id INTO var_batch_id;
+	INSERT INTO parameters (parameter_type_id, value, batch_id) VALUES
+	(1, 100, var_batch_id), --Высота
+	(3, 765, var_batch_id), --Давление
+	(2, 25, var_batch_id), --Темп.
+	(4, 15, var_batch_id), --Направ. ветра
+	(5, 6, var_batch_id); --Скорорость ветра
+	
+	RAISE NOTICE 'Тест по ТЗ';
+	CALL public.calculate_meteo(public.get_parameter_list(var_batch_id), 1);
+END $$;
+
+DO $$
+DECLARE
+	var_batch_id INTEGER;
+BEGIN
+	INSERT INTO batches (user_id, equipment_type_id, time_at) VALUES (1, 1, 24300) RETURNING id INTO var_batch_id;
+	INSERT INTO parameters (parameter_type_id, value, batch_id) VALUES
+	(1, 100, var_batch_id), --Высота
+	(3, 7650, var_batch_id), --Давление
+	(2, 250, var_batch_id), --Темп.
+	(4, 15, var_batch_id), --Направ. ветра
+	(5, 6, var_batch_id); --Скорорость ветра
+	
+	RAISE NOTICE 'Тест по с ошибками';
+	CALL public.calculate_meteo(public.get_parameter_list(var_batch_id), 1);
+END $$;
