@@ -149,10 +149,6 @@ BEGIN
 
 
  	--Проверка значений
-	IF calc_header IS NULL THEN
-		RAISE EXCEPTION 'Для типа оборудования % нет таблиц корректировок', par_equip_id;
-	END IF;
- 
 	IF par_input < calc_header[1] THEN --Слабыйветор/снос
 		dd := '00';
 		vv := '00';
