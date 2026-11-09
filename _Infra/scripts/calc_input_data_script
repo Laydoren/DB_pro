@@ -125,7 +125,7 @@ DECLARE
 	calc_header INTEGER[];
 	calc_speed INTEGER[];
 	calc_delta INTEGER;
-	calc_pos INTEGER;
+	calc_index INTEGER;
 	calc_params public.interpolation_params;
 	wind_direction NUMERIC;
 BEGIN
@@ -155,7 +155,7 @@ BEGIN
 	END IF;
 
  
-	calc_pos := round((par_input - calc_header[1]) / (calc_header[2] - calc_header[1])) + 1;
+	calc_index := round((par_input - calc_header[1]) / (calc_header[2] - calc_header[1])) + 1;
  
 	IF par_direction + calc_delta >= wind_direction THEN
 		dd := lpad((par_direction - wind_direction + calc_delta)::text, 2, '0');
@@ -163,7 +163,7 @@ BEGIN
 		dd := lpad((par_direction + calc_delta)::text, 2, '0');
 	END IF;
  
-	vv := lpad(calc_speed[calc_pos]::text, 2, '0');
+	vv := lpad(calc_speed[calc_index]::text, 2, '0');
 
 END;
 $BODY$;
