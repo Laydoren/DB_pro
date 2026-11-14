@@ -1,0 +1,142 @@
+DO $$
+BEGIN
+
+DROP PROCEDURE IF EXISTS public.calculate_meteo(public.parameter_list[], INTEGER);
+
+
+INSERT INTO constants (name, value) VALUES
+('negative_temperature', 50),
+('wind_direction', 60)
+ON CONFLICT (name) DO NOTHING;
+
+
+
+CREATE OR REPLACE PROCEDURE public.calculate_meteo(
+	p_params public.parameter_list[],
+	p_equip_id integer)
+    LANGUAGE 'plpgsql'
+AS $BODY$
+DECLARE
+	const_temp NUMERIC;
+	const_negative NUMERIC;
+	const_wind_direction NUMERIC;
+
+	proc_pack_id INTEGER := (p_params[1]).batch_id;
+	proc_has_error BOOLEAN;
+	proc_error_text TEXT;
+
+	proc_temp NUMERIC;
+	proc_direction INTEGER;
+	proc_wind NUMERIC;
+
+	proc_deviation INTEGER;
+	proc_tens INTEGER;
+	proc_units INTEGER;
+
+	proc_height RECORD;
+	proc_temp_header INTEGER[];
+	proc_temp_row INTEGER[];
+	proc_wind_header INTEGER[];
+	proc_wind_row INTEGER[];
+	proc_delta INTEGER;
+	proc_index INTEGER;
+
+	proc_tt INTEGER;
+	proc_dd TEXT;
+	proc_vv TEXT;
+BEGIN
+	--Проверка min/max параметров
+	SELECT has_error, error_text INTO proc_has_error, proc_error_text FROM public.error_check(p_params);
+	IF proc_has_error THEN
+		RAISE EXCEPTION '%', proc_error_text;
+	END IF;
+
+	SELECT value INTO const_temp FROM public.constants WHERE name = 'temperature';
+	SELECT value INTO const_negative FROM public.constants WHERE name = 'negative_temperature';
+	SELECT value INTO const_wind_direction FROM public.constants WHERE name = 'wind_direction';
+
+	--Получения значения параметра пачки
+	SELECT COALESCE(prm.value, pt.default_value) INTO proc_temp
+	FROM public.parameter_types AS pt
+		LEFT JOIN public.parameters AS prm ON prm.parameter_type_id = pt.id AND prm.batch_id = proc_pack_id
+	WHERE pt.id = 2;
+
+	SELECT COALESCE(prm.value, pt.default_value) INTO proc_direction
+	FROM public.parameter_types AS pt
+		LEFT JOIN public.parameters AS prm ON prm.parameter_type_id = pt.id AND prm.batch_id = proc_pack_id
+	WHERE pt.id = 4;
+
+	SELECT COALESCE(prm.value, pt.default_value) INTO proc_wind
+	FROM public.parameter_types AS pt
+		LEFT JOIN public.parameters AS prm ON prm.parameter_type_id = pt.id AND prm.batch_id = proc_pack_id
+	WHERE pt.id = CASE p_equip_id WHEN 1 THEN 5 ELSE 6 END;
+
+	--Расчёт отклонения температуры
+	proc_deviation := round(proc_temp + public.calc_interpolation(proc_temp, public.get_temperature_interpolation(proc_temp)) - const_temp);
+	proc_tens := abs(proc_deviation) / 10 * 10;
+	proc_units := abs(proc_deviation) % 10;
+
+	FOR proc_height IN SELECT id, height FROM public.calc_correction_heights ORDER BY height LOOP
+
+		--Расчёт температуры по таблице
+		SELECT h.header_values, c.row_values INTO proc_temp_header, proc_temp_row
+		FROM public.calc_correction AS c
+		JOIN public.calc_correction_types AS t ON t.id = c.type_id
+		JOIN public.calc_correction_headers AS h ON h.id = t.header_id
+		WHERE c.height_id = proc_height.id
+			AND t.code = CASE WHEN proc_deviation < 0 THEN 'TEMPERATURE_NEGATIVE' ELSE 'TEMPERATURE_POSITIVE' END;
+
+		proc_tt := CASE WHEN proc_tens > 0 THEN proc_temp_row[array_position(proc_temp_header, proc_tens)] ELSE 0 END
+			+ CASE WHEN proc_units > 0 THEN proc_temp_row[array_position(proc_temp_header, proc_units)] ELSE 0 END;
+
+		IF proc_deviation < 0 THEN
+			proc_tt := abs(proc_tt) + const_negative;
+		END IF;
+
+		--Расчёт скорости и направления по таблице
+		SELECT h.header_values, c.row_values INTO proc_wind_header, proc_wind_row
+		FROM public.calc_correction AS c
+		JOIN public.calc_correction_types AS t ON t.id = c.type_id
+		JOIN public.calc_correction_headers AS h ON h.id = t.header_id
+		WHERE c.height_id = proc_height.id AND t.measurment_equipment_id = p_equip_id
+			AND t.parent_id = (SELECT id FROM public.calc_correction_types WHERE code = 'WIND_SPEED');
+
+		SELECT c.row_values[1] INTO proc_delta
+		FROM public.calc_correction AS c
+		JOIN public.calc_correction_types AS t ON t.id = c.type_id
+		WHERE c.height_id = proc_height.id AND t.measurment_equipment_id = p_equip_id
+			AND t.parent_id = (SELECT id FROM public.calc_correction_types WHERE code = 'WIND_DIRECTION');
+
+		IF proc_wind < proc_wind_header[1] THEN --Слабый ветор/снос
+			proc_dd := '00';
+			proc_vv := '00';
+		ELSE
+			--Направ.
+			IF proc_direction + proc_delta >= const_wind_direction THEN
+				proc_dd := lpad((proc_direction - const_wind_direction + proc_delta)::text, 2, '0');
+			ELSE
+				proc_dd := lpad((proc_direction + proc_delta)::text, 2, '0');
+			END IF;
+
+			--Скорость.
+			proc_index := round((proc_wind - proc_wind_header[1]) / (proc_wind_header[2] - proc_wind_header[1])) + 1;
+			proc_vv := lpad(proc_wind_row[proc_index]::text, 2, '0');
+		END IF;
+
+		RAISE NOTICE 'H=% TT=% HH=% CC=%',
+			lpad((proc_height.height / 100)::text, 2, '0'),
+			lpad(proc_tt::text, 2, '0'),
+			proc_dd,
+			proc_vv;
+	END LOOP;
+END;
+$BODY$;
+
+ALTER PROCEDURE public.calculate_meteo(public.parameter_list[], integer)
+    OWNER TO postgres;
+
+COMMENT ON PROCEDURE public.calculate_meteo(public.parameter_list[], integer)
+    IS 'Расчёт метеобюллетеня по входящим параматрам';
+
+
+END $$;
